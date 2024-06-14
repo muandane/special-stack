@@ -21,3 +21,6 @@ tasks:
       - 'target/release/**/*'
   docker-buid:
     command: 'docker buildx build --platform linux/amd64,linux/arm64 -t muandane/mule:$tag --push .' 
+    options: 
+      runInCI: true
+
