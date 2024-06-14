@@ -2,8 +2,8 @@ name: Docker Image CI
 
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      tag:  ${{ github.event.release.tag_name }}
+      tag:  "2024.6.1-main"
     steps:
     - uses: actions/checkout@v4
     - name: Set up QEMU
