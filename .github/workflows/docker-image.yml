@@ -27,4 +27,4 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     - name: Install Moon
       uses: 'moonrepo/setup-toolchain@v0'
-    - run: 'moon ci'
+    - run: 'moon ci :docker-build'
