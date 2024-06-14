@@ -6,6 +6,7 @@ use tokio::io::AsyncReadExt;
 use std::path::PathBuf;
 use std::env;
 use tracing::{error, info, trace};
+use tokio::signal::unix::{signal, SignalKind};
 
 async fn serve_file(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     let cdn_root = env::var("CDN_ROOT").unwrap_or_else(|_| {
@@ -39,25 +40,38 @@ async fn serve_file(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         }
     }
 }
+
+fn get_cdn_root() -> String {
+    env::var("CDN_ROOT").unwrap_or_else(|_| {
+        info!("CDN_ROOT environment variable not set, using default path: ./cdn_root");
+        "./cdn_root".to_string()
+    })
+}
+
 #[tokio::main]
 async fn main() {
     // Initialize the tracing subscriber with the desired log level
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::TRACE)
         .init();
-    let cdn_root = env::var("CDN_ROOT").unwrap_or_else(|_| {
-        info!("CDN_ROOT environment variable not set, using default path: ./cdn_root");
-        "./cdn_root".to_string()
-    });
+    let cdn_root = get_cdn_root();
+    info!("Serving files from: {}", cdn_root);
 
     info!("Serving files from: {}", cdn_root);
     let make_svc = make_service_fn(|_conn| async {
         Ok::<_, Infallible>(service_fn(serve_file))
     });
     let addr = ([0, 0, 0, 0], 3000).into();
-    let server = Server::bind(&addr).serve(make_svc);
+    let server = Server::bind(&addr).serve(make_svc).with_graceful_shutdown(shutdown_signal());
+    
     info!("Listening on http://{}", addr);
     if let Err(e) = server.await {
         error!("Server error: {}", e);
     }
+}
+
+async fn shutdown_signal() {
+    let mut shutdown = signal(SignalKind::terminate()).expect("Failed to install signal handler");
+    shutdown.recv().await;
+    info!("Received shutdown signal, gracefully shutting down...");
 }
