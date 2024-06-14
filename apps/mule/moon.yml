@@ -1,0 +1,23 @@
+type: 'tool'
+language: 'rust'
+
+project:
+  name: 'mule'
+  description: 'A smoll cdn server.'
+  channel: '#mule'
+  owner: 'infra.platform'
+  maintainers: ['zine.moualhi']
+
+tasks:
+  dev:
+    command: 'cargo run'
+    inputs:
+      - 'src/**/*'
+  build:
+    command: 'cargo build --locked --release'
+    inputs:
+      - 'src/**/*'
+    outputs:
+      - 'target/release/**/*'
+  docker-buid:
+    command: 'docker buildx build --platform linux/amd64,linux/arm64 -t muandane/mule:$tag --push .' 

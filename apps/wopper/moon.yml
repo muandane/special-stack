@@ -1,0 +1,23 @@
+type: 'tool'
+language: 'javascript'
+
+project:
+  name: 'mule'
+  description: 'A smoll cdn server.'
+  channel: '#mule'
+  owner: 'infra.platform'
+  maintainers: ['zine.moualhi']
+
+tasks:
+  dev:
+    command: 'pnpm run dev'
+    inputs:
+      - 'src/**/*'
+  build:
+    command: 'pnpm run build'
+    inputs:
+      - 'src/**/*'
+    outputs:
+      - 'dist'
+  docker-buid:
+    command: 'docker buildx build --platform linux/amd64,linux/arm64 -t muandane/wopper:$tag --push .'
