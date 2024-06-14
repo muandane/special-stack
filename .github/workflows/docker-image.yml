@@ -14,8 +14,6 @@ jobs:
       tag: ${{ github.ref_name }}
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
     - name: Docker Setup Buildx
@@ -27,5 +25,5 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     - name: Install Moon
       uses: 'moonrepo/setup-toolchain@v0'
-    - run: 'moon ci client:docker-build'
-    - run: 'moon ci server:docker-build'
+    - run: 'moon run client:docker-build'
+    - run: 'moon run server:docker-build'
