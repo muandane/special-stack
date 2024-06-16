@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "mule.fullname" . }}-gateway
+  labels:
+    {{- include "mule.labels" . | nindent 4 }}
+  annotations:
+    konghq.com/strip-path: 'true'
+spec:
+  parentRefs:
+  - name: kong
+  hostnames:
+  - "mule.zine.local"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: {{ include "mule.fullname" . }}
+      port: 3000

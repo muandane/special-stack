@@ -1,0 +1,30 @@
+{{ if .Values.volume }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mule.fullname" . }}-pvc
+  labels:
+    {{- include "mule.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.volume.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.volume.volumeSize }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "mule.fullname" . }}-pv
+  labels:
+    {{- include "mule.labels" . | nindent 4 }}
+spec:
+  storageClassName: {{ .Values.volume.storageClassName }} 
+  capacity:
+    storage: {{ .Values.volume.volumeSize }} 
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: {{ .Values.volume.mountPath }}
+{{ end -}}
