@@ -2,6 +2,10 @@
 
 just a smoll cdn in rust
 
+variables:
+
+CDN_ROOT: set a custom folder to store your files
+DEBUG: true,false for level of verbosity
 ## Building and running your application
 
 When you're ready, start your application by running:
