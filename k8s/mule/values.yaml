@@ -61,15 +61,16 @@ resources: {}
   #   memory: 128Mi
 
 livenessProbe:
-  enabled: false
-  # httpGet:
-  #   path: /
-  #   port: http
+  enabled: true
+  httpGet:
+    path: /
+    port: http
+    
 readinessProbe:
-  enabled: false
-  # httpGet:
-  #   path: /
-  #   port: http
+  enabled: true
+  httpGet:
+    path: /
+    port: http
 
 # Additional volumes on the output Deployment definition.
 volume:
