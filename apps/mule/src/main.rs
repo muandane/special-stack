@@ -1,93 +1,48 @@
-use hyper::{Body, Request, Response, Server, StatusCode};
+mod handlers;
+mod cache;
+mod config;
+mod shutdown;
+
+use handlers::file::serve_file;
+use handlers::management::{cache_file, get_cache_mapping};
+use handlers::health::health_check;
+use cache::Cache;
+use config::init_logging;
+use shutdown::shutdown_signal;
+use hyper::{Server, Response, Body, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
 use std::convert::Infallible;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
-use std::path::PathBuf;
 use std::env;
-use tracing::{error, info};
-use tokio::signal::unix::{signal, SignalKind};
-
-fn get_cdn_root() -> String {
-    env::var("CDN_ROOT").unwrap_or_else(|_| {
-        "./cdn_root".to_string()
-    })
-}
-
-async fn serve_file(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    let cdn_root = env::var("CDN_ROOT").unwrap_or_else(|_| {
-        "./cdn_root".to_string()
-    });
-
-    let path = req.uri().path().trim_start_matches('/');
-    let file_path = PathBuf::from(&cdn_root).join(path);
-
-    info!("Serving file: {}", file_path.display());
-
-    match File::open(&file_path).await {
-        Ok(mut file) => {
-            let mut contents = Vec::new();
-            if let Err(e) = file.read_to_end(&mut contents).await {
-                error!("Error reading file: {}", e);
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from("Internal Server Error"))
-                    .unwrap());
-            }
-            Ok(Response::new(Body::from(contents)))
-        }
-        Err(e) => {
-            error!("File not found: {}", e);
-            Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::from("File Not Found"))
-                .unwrap())
-        }
-    }
-}
-
-async fn health_check(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    let response_body = "OK";
-    info!("Health check status: {}", response_body);
-    Ok(Response::new(Body::from(response_body)))
-}
-
-async fn shutdown_signal() {
-    // Create a future to listen for the SIGINT (Ctrl+C) signal
-    let mut sigint = signal(SignalKind::interrupt()).expect("Failed to register SIGINT handler");
-
-    // Create a future to listen for the SIGTERM signal
-    let mut sigterm = signal(SignalKind::terminate()).expect("Failed to register SIGTERM handler");
-
-    // Wait for either SIGINT or SIGTERM
-    tokio::select! {
-        _ = sigint.recv() => {
-            info!("Received SIGINT, shutting down gracefully");
-        }
-        _ = sigterm.recv() => {
-            info!("Received SIGTERM, shutting down gracefully");
-        }
-    }
-}
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::info;
 
 #[tokio::main]
 async fn main() {
-    let log_level = if env::var("DEBUG").unwrap_or_else(|_| "false".to_string()) == "true" {
-        tracing::Level::TRACE
-    } else {
-        tracing::Level::INFO
-    };
-    // Initialize the tracing subscriber with the desired log level
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .init();
+    // Initialize logging
+    init_logging();
 
-    let cdn_root = get_cdn_root();
+    let cdn_root = env::var("CDN_ROOT").unwrap_or_else(|_| {
+        info!("CDN_ROOT environment variable not set, using default path: ./cdn_root");
+        "./cdn_root".to_string()
+    });
+
     info!("Serving files from: {}", cdn_root);
 
+    // Create the cache
+    let cache: Cache = Arc::new(RwLock::new(std::collections::HashMap::new()));
+    let cache_for_main_svc = Arc::clone(&cache);
+    let cache_for_management_svc = Arc::clone(&cache);
+
     // Main file server
-    let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, Infallible>(service_fn(serve_file))
+    let make_svc = make_service_fn(move |_conn| {
+        let cache = Arc::clone(&cache_for_main_svc);
+        async move {
+            Ok::<_, Infallible>(service_fn(move |req| {
+                let cache = Arc::clone(&cache);
+                serve_file(req, cache)
+            }))
+        }
     });
 
     let addr = ([0, 0, 0, 0], 3000).into();
@@ -107,16 +62,48 @@ async fn main() {
 
     info!("Health check server listening on http://{}", health_addr);
 
-    // Run both servers concurrently
+    // Management server for caching and health check
+    let management_svc = make_service_fn(move |_conn| {
+        let cache = Arc::clone(&cache_for_management_svc);
+        async move {
+            Ok::<_, Infallible>(service_fn(move |req| {
+                let cache = Arc::clone(&cache);
+                async move {
+                    match (req.method(), req.uri().path()) {
+                        (&hyper::Method::POST, "/cache") => cache_file(req, cache).await,
+                        (&hyper::Method::GET, "/mappings") => get_cache_mapping(req, cache).await,
+                        _ => Ok(Response::builder()
+                                .status(StatusCode::NOT_FOUND)
+                                .body(Body::from("Not Found"))
+                                .unwrap()
+                        ),
+                    }
+                }
+            }))
+        }
+    });
+
+    let management_addr = ([0, 0, 0, 0], 9001).into();
+    let management_server = Server::bind(&management_addr).serve(management_svc);
+    let graceful_management_server = management_server.with_graceful_shutdown(shutdown_signal());
+
+    info!("Management server listening on http://{}", management_addr);
+
+    // Run all servers concurrently
     tokio::select! {
         res = graceful_server => {
             if let Err(e) = res {
-                error!("File server error: {}", e);
+                tracing::error!("File server error: {}", e);
             }
         }
         res = graceful_health_server => {
             if let Err(e) = res {
-                error!("Health check server error: {}", e);
+                tracing::error!("Health check server error: {}", e);
+            }
+        }
+        res = graceful_management_server => {
+            if let Err(e) = res {
+                tracing::error!("Management server error: {}", e);
             }
         }
     }

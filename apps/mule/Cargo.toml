@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 hyper = { version = "0.14", features = ["full", "server"] }
 tokio = { version = "1", features = ["full"] }
-walkdir = "2.3"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+sha2 = "0.9"
+reqwest = { version = "0.11", features = ["json"] }
