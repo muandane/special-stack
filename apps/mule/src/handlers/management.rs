@@ -1,70 +1,43 @@
 use hyper::{Body, Request, Response, StatusCode};
-use std::convert::Infallible;
-use std::env;
+use crate::db::DbPool;
+use crate::cache::{add_to_cache, fetch_mappings};
 use tracing::{info, error};
+use std::convert::Infallible;
+use serde_json::json;
 use sha2::{Sha256, Digest};
 use tokio::fs;
-use std::path::PathBuf;
-use reqwest;
+use tokio::io::AsyncWriteExt;
 
-use crate::cache::Cache;
-
-pub async fn cache_file(req: Request<Body>, cache: Cache) -> Result<Response<Body>, Infallible> {
+pub async fn cache_file(req: Request<Body>, db: DbPool) -> Result<Response<Body>, Infallible> {
     let whole_body = hyper::body::to_bytes(req.into_body()).await.unwrap();
     let url = String::from_utf8(whole_body.to_vec()).unwrap();
+    let hash = format!("{:x}", Sha256::digest(url.as_bytes()));
 
-    // Fetch the file content from the given URL
-    let content = match reqwest::get(&url).await {
-        Ok(resp) => match resp.bytes().await {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                error!("Failed to read bytes from response: {}", e);
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from("Failed to read bytes from response"))
-                    .unwrap());
-            }
+    match reqwest::get(&url).await {
+        Ok(resp) => {
+            let bytes = resp.bytes().await.unwrap();
+            let cdn_root = "./cdn_root".to_string();
+            let file_path = format!("{}/{}", cdn_root, hash);
+            let mut file = fs::File::create(&file_path).await.unwrap();
+            file.write_all(&bytes).await.unwrap();
+
+            add_to_cache(db, &hash, &url).await;
+            info!("Cached file '{}' with hash '{}'", &url, &hash);
+            Ok(Response::new(Body::from("Cached successfully")))
         },
-        Err(e) => {
-            error!("Failed to fetch file from URL: {}", e);
-            return Ok(Response::builder()
+        Err(err) => {
+            error!("Failed to fetch the URL: {}", err);
+            Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("Failed to fetch file from URL"))
-                .unwrap());
+                .body(Body::from("Failed to fetch the URL"))
+                .unwrap())
         }
-    };
-
-    // Generate a hash for the filename
-    let mut hasher = Sha256::new();
-    hasher.update(&url);
-    let hash = format!("{:x}", hasher.finalize());
-
-    // Store the file in the CDN root directory with the hashed name
-    let cdn_root = env::var("CDN_ROOT").unwrap_or_else(|_| "./cdn_root".to_string());
-    let file_path = PathBuf::from(&cdn_root).join(&hash);
-    if let Err(e) = fs::write(&file_path, &content).await {
-        error!("Failed to write file to CDN: {}", e);
-        return Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Body::from("Failed to write file to CDN"))
-            .unwrap());
     }
-
-    // Update the cache mapping
-    {
-        let mut cache_lock = cache.write().await;
-        cache_lock.insert(hash.clone(), url.clone());
-    }
-
-    info!("Cached file from {} to {}", url.clone(), file_path.display());
-
-    Ok(Response::new(Body::from(hash)))
 }
 
-pub async fn get_cache_mapping(_req: Request<Body>, cache: Cache) -> Result<Response<Body>, Infallible> {
-    let cache_lock = cache.read().await;
-    let mappings: Vec<String> = cache_lock.iter().map(|(k, v)| format!("{} -> {}", k, v)).collect();
-    let body = mappings.join("\n");
+pub async fn get_cache_mapping(_req: Request<Body>, db: DbPool) -> Result<Response<Body>, Infallible> {
+    let mappings = fetch_mappings(db).await;
+    let json = json!(mappings);
 
-    Ok(Response::new(Body::from(body)))
+    Ok(Response::new(Body::from(json.to_string())))
 }
