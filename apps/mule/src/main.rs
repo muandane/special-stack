@@ -24,14 +24,18 @@ async fn main() {
     init_logging();
 
     let cdn_root = env::var("CDN_ROOT").unwrap_or_else(|_| {
-        info!("CDN_ROOT environment variable not set, using default path: ./cdn_root");
-        "./cdn_root".to_string()
+        info!("CDN_ROOT environment variable not set, using default path: /data/content");
+        "/data/content".to_string()
     });
 
     info!("Serving files from: {}", cdn_root);
+    let db_path = env::var("DB_PATH").unwrap_or_else(|_| {
+        info!("DB_PATH environment variable not set, using default path: /data/db/cache_mappings.db");
+        "/data/db".to_string()
+    });
 
-    let db_url = "sqlite://data/db/cache_mappings.db";
-    let db_pool = init_db(db_url).await;
+    let db_url = format!("sqlite://{}/cache_mappings.db", db_path);
+    let db_pool = init_db(&db_url).await;
 
     // Main file server
     let db_pool_for_main_svc = Arc::clone(&db_pool);
@@ -56,12 +60,14 @@ async fn main() {
     let db_pool_for_management_svc = Arc::clone(&db_pool);
     let management_svc = make_service_fn(move |_conn| {
         let db_pool = Arc::clone(&db_pool_for_management_svc);
+        let cdn_root = cdn_root.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |req: Request<Body>| {
                 let db_pool = Arc::clone(&db_pool);
+                let cdn_root = cdn_root.clone();
                 async move {
                     match (req.method(), req.uri().path()) {
-                        (&hyper::Method::POST, "/cache") => cache_file(req, db_pool).await,
+                        (&hyper::Method::POST, "/cache") => cache_file(cdn_root, req, db_pool).await,
                         (&hyper::Method::GET, "/mappings") => get_cache_mapping(req, db_pool).await,
                         _ => Ok(Response::builder()
                             .status(StatusCode::NOT_FOUND)

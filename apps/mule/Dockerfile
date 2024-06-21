@@ -7,9 +7,21 @@
 
 ARG RUST_VERSION=1.79.0
 ARG APP_NAME=mule
-
+ARG CARGO_INCREMENTAL=0
 ################################################################################
 # Create a stage for building the application.
+
+FROM rust:${RUST_VERSION}-bookworm  AS planner
+WORKDIR /app
+RUN cargo install cargo-chef
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM rust:${RUST_VERSION}-bookworm AS cacher
+WORKDIR /app
+RUN cargo install cargo-chef
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
 FROM rust:${RUST_VERSION}-bookworm  AS build
 ARG APP_NAME
@@ -17,6 +29,8 @@ WORKDIR /app
 
 # Install host build dependencies.
 # RUN apt add --no-cache clang lld git
+COPY --from=cacher /app/target target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
 
 # Build the application.
 # Leverage a cache mount to /usr/local/cargo/registry/
@@ -26,6 +40,7 @@ WORKDIR /app
 # Leverage a bind mount to the src directory to avoid having to copy the
 # source code into the container. Once built, copy the executable to an
 # output directory before the cache mounted /app/target is unmounted.
+
 RUN --mount=type=bind,source=src,target=src \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \

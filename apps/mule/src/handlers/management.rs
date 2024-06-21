@@ -8,7 +8,7 @@ use sha2::{Sha256, Digest};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
-pub async fn cache_file(req: Request<Body>, db: DbPool) -> Result<Response<Body>, Infallible> {
+pub async fn cache_file(cdn_root: String,req: Request<Body>, db: DbPool) -> Result<Response<Body>, Infallible> {
     let whole_body = hyper::body::to_bytes(req.into_body()).await.unwrap();
     let url = String::from_utf8(whole_body.to_vec()).unwrap();
     let hash = format!("{:x}", Sha256::digest(url.as_bytes()));
@@ -16,7 +16,6 @@ pub async fn cache_file(req: Request<Body>, db: DbPool) -> Result<Response<Body>
     match reqwest::get(&url).await {
         Ok(resp) => {
             let bytes = resp.bytes().await.unwrap();
-            let cdn_root = "/data/content".to_string();
             let file_path = format!("{}/{}", cdn_root, hash);
             let mut file = fs::File::create(&file_path).await.unwrap();
             file.write_all(&bytes).await.unwrap();
