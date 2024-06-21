@@ -11,26 +11,12 @@ ARG CARGO_INCREMENTAL=0
 ################################################################################
 # Create a stage for building the application.
 
-FROM rust:${RUST_VERSION}-bookworm  AS planner
-WORKDIR /app
-RUN cargo install cargo-chef
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-
-FROM rust:${RUST_VERSION}-bookworm AS cacher
-WORKDIR /app
-RUN cargo install cargo-chef
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
-
 FROM rust:${RUST_VERSION}-bookworm  AS build
 ARG APP_NAME
 WORKDIR /app
 
 # Install host build dependencies.
 # RUN apt add --no-cache clang lld git
-COPY --from=cacher /app/target target
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
 
 # Build the application.
 # Leverage a cache mount to /usr/local/cargo/registry/
@@ -62,6 +48,7 @@ cp ./target/release/$APP_NAME /bin/server
 # (e.g., alpine@sha256:664888ac9cfd28068e062c991ebcff4b4c7307dc8dd4df9e728bedde5c449d91).
 FROM cgr.dev/chainguard/wolfi-base:latest AS final
 
+RUN apk update && apk add --no-cache libgcc
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
 ARG UID=10001

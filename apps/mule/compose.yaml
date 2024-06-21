@@ -12,6 +12,12 @@ services:
     build:
       context: .
       target: final
+      x-bake:
+        tags:
+          - "muandane/mule:${tag}"
+        platforms:
+          - linux/amd64
+          - linux/arm64
     ports:
       - 3000:3000
 

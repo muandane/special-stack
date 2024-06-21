@@ -61,13 +61,11 @@ resources: {}
   #   memory: 128Mi
 
 livenessProbe:
-  enabled: true
   httpGet:
     path: /
     port: 8080
     
 readinessProbe:
-  enabled: true
   httpGet:
     path: /
     port: 8080

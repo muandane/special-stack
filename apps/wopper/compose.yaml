@@ -11,6 +11,12 @@ services:
   server:
     build:
       context: .
+      x-bake:
+        tags:
+          - "muandane/wopper:${tag}"
+        platforms:
+          - linux/amd64
+          - linux/arm64
     environment:
       NODE_ENV: production
     ports:
