@@ -1,30 +1,33 @@
-{{ if .Values.volume }}
+{{- if .Values.volumes }}
+{{- range $name, $volume := .Values.volumes }}
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "mule.fullname" . }}-pvc
+  name: {{ include "mule.fullname" $ }}-{{ $name }}-pvc
   labels:
-    {{- include "mule.labels" . | nindent 4 }}
+    {{- include "mule.labels" $ | nindent 4 }}
 spec:
   accessModes:
-    - ReadWriteOnce
-  storageClassName: {{ .Values.volume.storageClassName }}
+    - {{ $volume.accessMode | default "ReadWriteOnce" }}
+  storageClassName: {{ $volume.storageClassName }}
   resources:
     requests:
-      storage: {{ .Values.volume.volumeSize }}
+      storage: {{ $volume.size }}
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ include "mule.fullname" . }}-pv
+  name: {{ include "mule.fullname" $ }}-{{ $name }}-pv
   labels:
-    {{- include "mule.labels" . | nindent 4 }}
+    {{- include "mule.labels" $ | nindent 4 }}
 spec:
-  storageClassName: {{ .Values.volume.storageClassName }} 
+  storageClassName: {{ $volume.storageClassName }}
   capacity:
-    storage: {{ .Values.volume.volumeSize }} 
+    storage: {{ $volume.size }}
   accessModes:
-    - ReadWriteOnce
+    - {{ $volume.accessMode | default "ReadWriteOnce" }}
   hostPath:
-    path: {{ .Values.volume.mountPath }}
-{{ end -}}
+    path: {{ $volume.mountPath }}
+{{- end }}
+{{- end }}

@@ -8,7 +8,7 @@ image:
   repository: muandane/mule
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "2024.6.2-main"
+  tag: "2024.6.3-main"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -64,20 +64,31 @@ livenessProbe:
   enabled: true
   httpGet:
     path: /
-    port: http
+    port: 8080
     
 readinessProbe:
   enabled: true
   httpGet:
     path: /
-    port: http
+    port: 8080
 
 # Additional volumes on the output Deployment definition.
 volume:
   storageClassName: default
   volumeSize: 1Gi
-  mountPath: "/cdn_root"
+  mountPath: "/data"
   readOnly: true
+
+volumes:
+  db:
+    storageClassName: default
+    size: 1Gi
+    mountPath: /data/db
+  content:
+    storageClassName: default
+    size: 5Gi
+    mountPath: /data/content
+    # accessMode: ReadWriteMany
 
 # - name: foo
 #   secret:

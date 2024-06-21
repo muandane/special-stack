@@ -47,12 +47,16 @@ spec:
           {{ end -}}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.volume }}
+          {{- if .Values.volumes }}
           volumeMounts:
-            - name: {{ include "mule.fullname" . }}-pv
-              mountPath: {{ .Values.volume.mountPath }}
-              # readOnly: {{ .Values.volume.readOnly }}
-          {{- end }}
+            {{- range $name, $volume := .Values.volumes }}
+            - name: {{ $name }}
+              mountPath: {{ $volume.mountPath }}
+              {{ if $volume.readOnly }}
+              readOnly: {{ $volume.readOnly }}
+              {{ end }}
+            {{- end }}
+{{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -65,9 +69,11 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.volume }}
+      {{- if .Values.volumes }}
       volumes:
-        - name: {{ include "mule.fullname" . }}-pv
+        {{- range $name, $volume := .Values.volumes }}
+        - name: {{ $name }}
           persistentVolumeClaim:
-            claimName: {{ include "mule.fullname" . }}-pvc
+            claimName: {{ include "mule.fullname" $ }}-{{ $name }}-pvc
+        {{- end }}
       {{- end }}

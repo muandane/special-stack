@@ -11,7 +11,7 @@ ARG APP_NAME=mule
 ################################################################################
 # Create a stage for building the application.
 
-FROM rust:${RUST_VERSION}-alpine AS build
+FROM cgr.dev/chainguard/rust@sha256:2db23ec90f12c33a34eff88748f2cec671c8158a9a76a92a6ddf5f652bf5760a AS build
 ARG APP_NAME
 WORKDIR /app
 
