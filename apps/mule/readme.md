@@ -5,6 +5,7 @@ just a smoll cdn in rust
 variables:
 
 CDN_ROOT: set a custom folder to store your files
+DB_PATH: set a custom folder to store your database
 DEBUG: true,false for level of verbosity
 ## Building and running your application
 
