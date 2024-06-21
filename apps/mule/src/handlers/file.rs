@@ -7,7 +7,7 @@ use tracing::info;
 
 pub async fn serve_file(req: Request<Body>, _cache: crate::cache::Cache) -> Result<Response<Body>, Infallible> {
     let cdn_root = std::env::var("CDN_ROOT").unwrap_or_else(|_| {
-        "./cdn_root".to_string()
+        "/data/content".to_string()
     });
 
     let path = req.uri().path().trim_start_matches('/');

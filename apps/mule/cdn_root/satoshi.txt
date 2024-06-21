@@ -1,5 +1,0 @@
-satoshi | səˈtōSHē |
-noun (plural satoshi or plural satoshis)
-the smallest monetary unit in the bitcoin cryptocurrency system, equal to one hundred millionth of a bitcoin: the exchange charges 57,000 satoshis for each withdrawal | it's hard to imagine a worse experience than losing every satoshi of your investment.
-ORIGIN
-early 21st century: from the name of Satoshi Nakamoto, to whom the introduction of the Bitcoin system is attributed, presumed to be a pseudonym for one or more unknown persons.

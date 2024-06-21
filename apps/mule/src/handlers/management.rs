@@ -16,7 +16,7 @@ pub async fn cache_file(req: Request<Body>, db: DbPool) -> Result<Response<Body>
     match reqwest::get(&url).await {
         Ok(resp) => {
             let bytes = resp.bytes().await.unwrap();
-            let cdn_root = "./cdn_root".to_string();
+            let cdn_root = "/data/content".to_string();
             let file_path = format!("{}/{}", cdn_root, hash);
             let mut file = fs::File::create(&file_path).await.unwrap();
             file.write_all(&bytes).await.unwrap();

@@ -30,7 +30,7 @@ async fn main() {
 
     info!("Serving files from: {}", cdn_root);
 
-    let db_url = "sqlite://./data/cache_mappings.db";
+    let db_url = "sqlite://data/db/cache_mappings.db";
     let db_pool = init_db(db_url).await;
 
     // Main file server
