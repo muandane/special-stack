@@ -5,15 +5,18 @@
 
 # Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
 
-ARG RUST_VERSION=1.77.2
+ARG RUST_VERSION=1.79.0
 ARG APP_NAME=mule
 
 ################################################################################
 # Create a stage for building the application.
 
-FROM cgr.dev/chainguard/rust@sha256:2db23ec90f12c33a34eff88748f2cec671c8158a9a76a92a6ddf5f652bf5760a AS build
+FROM rust:${RUST_VERSION}-bookworm  AS build
 ARG APP_NAME
 WORKDIR /app
+
+# Install host build dependencies.
+# RUN apt add --no-cache clang lld git
 
 # Build the application.
 # Leverage a cache mount to /usr/local/cargo/registry/
