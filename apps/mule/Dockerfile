@@ -15,9 +15,6 @@ FROM cgr.dev/chainguard/rust@sha256:2db23ec90f12c33a34eff88748f2cec671c8158a9a76
 ARG APP_NAME
 WORKDIR /app
 
-# Install host build dependencies.
-RUN apk update && apk add --no-cache clang lld musl-dev git
-
 # Build the application.
 # Leverage a cache mount to /usr/local/cargo/registry/
 # for downloaded dependencies, a cache mount to /usr/local/cargo/git/db
