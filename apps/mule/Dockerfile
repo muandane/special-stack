@@ -8,17 +8,15 @@
 ARG RUST_VERSION=1.79.0
 ARG APP_NAME=mule
 ARG CARGO_INCREMENTAL=0
-ARG RUSTFLAGS="-Z threads=8"
 ################################################################################
 # Create a stage for building the application.
 
-FROM rustlang/rust:nightly-bookworm-slim AS build
+FROM rust:${RUST_VERSION}-bookworm  AS build
 ARG APP_NAME
 WORKDIR /app
-
 # Install host build dependencies.
-RUN apt update && apt install --no-install-recommends clang lld git pkg-config -y
-
+# RUN apt add --no-cache clang lld git
+RUN rustup default nightly
 # Build the application.
 # Leverage a cache mount to /usr/local/cargo/registry/
 # for downloaded dependencies, a cache mount to /usr/local/cargo/git/db
@@ -28,6 +26,7 @@ RUN apt update && apt install --no-install-recommends clang lld git pkg-config -
 # source code into the container. Once built, copy the executable to an
 # output directory before the cache mounted /app/target is unmounted.
 
+ARG RUSTFLAGS="-Z threads=8"
 RUN --mount=type=bind,source=src,target=src \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \

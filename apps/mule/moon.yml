@@ -27,8 +27,8 @@ tasks:
       runInCI: true
   docker-build:
     command: 'docker buildx bake --push'
-    deps:
-      - 'check'
+    # deps:
+    #   - 'check'
     options: 
       runInCI: true
 
