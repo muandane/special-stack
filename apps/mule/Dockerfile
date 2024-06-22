@@ -17,7 +17,7 @@ ARG APP_NAME
 WORKDIR /app
 
 # Install host build dependencies.
-RUN apt install --no-install-recommends clang lld git pkg-config -y
+RUN apt update && apt install --no-install-recommends clang lld git pkg-config -y
 
 # Build the application.
 # Leverage a cache mount to /usr/local/cargo/registry/
