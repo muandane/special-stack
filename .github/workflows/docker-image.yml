@@ -25,6 +25,11 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: rust-toolchain              
+      uses: actions-rs/toolchain@v1.0.6
+      with:
+        toolchain: nightly
+        profile: minimal
     - name: Install Moon
       uses: 'moonrepo/setup-toolchain@v0'
     - run: 'moon run :docker-build'

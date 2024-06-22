@@ -13,14 +13,26 @@ tasks:
     command: 'cargo run'
     inputs:
       - 'src/**/*'
+  check:
+    command: 'cargo check'
+    inputs:
+      - 'src/**/*'
+    outputs:
+      - 'target/release/**/*'
+    options: 
+      runInCI: true
   build:
     command: 'cargo build --locked --release'
     inputs:
       - 'src/**/*'
     outputs:
       - 'target/release/**/*'
+    options: 
+      runInCI: true
   docker-build:
-    command: 'docker buildx bake' 
+    command: 'docker buildx bake --push'
+    deps:
+      - 'check'
     options: 
       runInCI: true
 

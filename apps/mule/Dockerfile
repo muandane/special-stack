@@ -8,10 +8,11 @@
 ARG RUST_VERSION=1.79.0
 ARG APP_NAME=mule
 ARG CARGO_INCREMENTAL=0
+ARG RUSTFLAGS="-Z threads=8"
 ################################################################################
 # Create a stage for building the application.
 
-FROM rust:${RUST_VERSION}-bookworm  AS build
+FROM rustlang/rust:nightly-bookworm-slim AS build
 ARG APP_NAME
 WORKDIR /app
 
