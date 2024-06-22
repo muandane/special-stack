@@ -15,10 +15,6 @@ tasks:
       - 'src/**/*'
   check:
     command: 'cargo check'
-    inputs:
-      - 'src/**/*'
-    outputs:
-      - 'target/release/**/*'
     options: 
       runInCI: true
   build:
