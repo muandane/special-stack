@@ -1,44 +1,50 @@
 <script>
   import { onMount } from 'svelte';
-  /** @type {string} */
+
+  /**
+	 * @type {RequestInfo | URL}
+	 */
   export let backgroundUrl;
 
-  /** @type {number | null} */
+  /**
+	 * @type {number | null}
+	 */
   let latency = null;
-
-  /** @type {number | null} */
+  /**
+	 * @type {number | null}
+	 */
   let serverLatency = null;
-
-  /** @type {string | null} */
+  /**
+	 * @type {string | null}
+	 */
   let serverLocation = null;
 
   async function measureLatency() {
     try {
+      console.log('Measuring latency for:', backgroundUrl);
+
       // Measure latency for backgroundUrl
-      const startTime = performance.now();
-      const response = await fetch(backgroundUrl);
-      const endTime = performance.now();
+      let startTime = performance.now();
+      let response = await fetch(backgroundUrl);
+      let endTime = performance.now();
       latency = endTime - startTime;
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch background URL');
-      }
+      if (!response.ok) throw new Error(`Failed to fetch background URL: ${response.statusText}`);
 
       // Measure latency for the server
-      const serverStartTime = performance.now();
-      const serverEndTime = performance.now();
-      serverLatency = serverEndTime - serverStartTime;
-      const serverResponse = await fetch('https://worldtimeapi.org/api/ip');
+      startTime = performance.now();
+      response = await fetch('https://worldtimeapi.org/api/ip');
+      endTime = performance.now();
+      serverLatency = endTime - startTime;
 
-      if (!serverResponse.ok) {
-        throw new Error('Failed to fetch server data');
-      }
+      if (!response.ok) throw new Error(`Failed to fetch server data: ${response.statusText}`);
 
-      const serverData = await serverResponse.json();
-      serverLocation = serverData.timezone;
+      const data = await response.json();
+      serverLocation = data.timezone;
     } catch (error) {
-      console.error('Error measuring latency:', error);
-      latency = serverLatency = -1; // Use -1 to indicate an error
+      // @ts-ignore
+      console.error('Error measuring latency:', error.message);
+      latency = serverLatency = -1;
       serverLocation = 'Error';
     }
   }
@@ -78,8 +84,8 @@
     top: 20px;
     left: 20px;
     z-index: 1000;
-    width: clamp(140px, 25vw, 350px); /* Adjusted for better responsiveness */
-    height: auto; /* Auto height to fit content */
+    width: clamp(140px, 25vw, 350px);
+    height: auto;
     max-height: 150px;
     overflow-wrap: break-word;
     word-break: break-all;
@@ -105,7 +111,7 @@
 
 <div class="latency-counter">
   <div class="large">Latency Counter</div>
-  <div class="small">Client: {latency !== null ? latency.toFixed(2) + ' ms' : 'Calculating...'}</div>
+  <div class="small">Client: {latency !== null ? (latency !== -1 ? `${latency.toFixed(2)} ms` : 'Error') : 'Calculating...'}</div>
   <div class="small">Server Location: {serverLocation || 'Fetching...'}</div>
-  <div class="small">Server: {serverLatency !== null && serverLatency !== -1 ? serverLatency.toFixed(2) + ' ms' : 'Calculating...'}</div>
+  <div class="small">Server: {serverLatency !== null ? (serverLatency !== -1 ? `${serverLatency.toFixed(2)} ms` : 'Error') : 'Calculating...'}</div>
 </div>
