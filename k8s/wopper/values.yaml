@@ -8,7 +8,7 @@ image:
   repository: muandane/wopper
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "2024.6.2-main"
+  tag: "24.6.3-main"
 
 imagePullSecrets: []
 nameOverride: ""

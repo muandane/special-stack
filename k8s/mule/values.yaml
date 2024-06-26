@@ -17,9 +17,8 @@ fullnameOverride: ""
 podAnnotations: {}
 podLabels: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
+podSecurityContext:
+  runAsUser: 0
 securityContext: {}
   # capabilities:
   #   drop:
@@ -33,7 +32,7 @@ service:
   port: 3000
 
 ingress:
-  enabled: false
+  enabled: true
   className: ""
   annotations: {}
     # kubernetes.io/ingress.class: nginx

@@ -1,10 +1,14 @@
 <script>
 	/*const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
 	const imageText = import.meta.env.VITE_EPIC_NAME;*/
-	import 'dotenv/config';
-	const backgroundUrl = process.env.PUBLIC_EPIC_GIF;
-	const imageText = process.env.PUBLIC_EPIC_NAME;
+	const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
+	const imageText = import.meta.env.VITE_EPIC_NAME;
+	// import 'dotenv/config';
+	import LatencyCounter from './HUD.svelte';
+	// const backgroundUrl = process.env.PUBLIC_EPIC_GIF;
+	// const imageText = process.env.PUBLIC_EPIC_NAME;
 </script>
+
 
 <div class="container">
 	<p>{imageText}</p>
@@ -38,6 +42,7 @@
 	</div>
 </div>
 
+<LatencyCounter {backgroundUrl} />
 <style>
 	:root {
 		--min-fs: 0.5;
@@ -47,7 +52,7 @@
 
 		--min-fs-rem: calc(var(--min-fs) * 1rem);
 		--max-fs-rem: calc(var(--max-fs) * 1rem);
-		--min-vw-rem: calc(var(--min-vw) * 1vw);
+		--min-vw-rem: calc(var(--min-vw) * 0.1vw);
 
 		--slope: calc((var(--max-fs) - var(--min-fs)) * (100vw - var(--min-vw-rem)) / (var(--max-vw) - var(--min-vw)));
 

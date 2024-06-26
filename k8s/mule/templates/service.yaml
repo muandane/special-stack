@@ -11,5 +11,9 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: 9001
+      targetPort: http
+      protocol: TCP
+      name: managment
   selector:
     {{- include "mule.selectorLabels" . | nindent 4 }}

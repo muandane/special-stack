@@ -33,7 +33,7 @@ RUN --mount=type=bind,source=src,target=src \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-cargo build --locked --release && \
+cargo build --release && \
 cp ./target/release/$APP_NAME /bin/server
 
 ################################################################################
@@ -51,7 +51,8 @@ FROM cgr.dev/chainguard/wolfi-base:latest AS final
 RUN apk update && apk add --no-cache libgcc
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
-ARG UID=10001
+ARG UID=1000
+
 RUN adduser \
     --disabled-password \
     --gecos "" \
@@ -60,10 +61,20 @@ RUN adduser \
     --no-create-home \
     --uid "${UID}" \
     mule
-USER mule
 
-# Copy the executable from the "build" stage.
+ENV CDN_ROOT=/data/content
+ENV DB_PATH=/data/db
+
+RUN mkdir -p /data/content /data/db && \
+    chown -R mule:mule /data && \
+    chmod -R 755 /data
+
 COPY --from=build /bin/server /bin/
+
+VOLUME ["/data/content", "/data/db"]
+
+USER mule
+# Copy the executable from the "build" stage.
 
 # Expose the port that the application listens on.
 EXPOSE 3000
