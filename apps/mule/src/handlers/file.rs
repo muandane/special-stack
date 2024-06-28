@@ -4,6 +4,7 @@ use tokio::io::AsyncReadExt;
 use std::path::PathBuf;
 use std::convert::Infallible;
 use tracing::info;
+use crate::utils::with_cors;
 
 pub async fn serve_file(req: Request<Body>, _cache: crate::cache::Cache) -> Result<Response<Body>, Infallible> {
     let cdn_root = std::env::var("CDN_ROOT").unwrap_or_else(|_| {
@@ -19,18 +20,18 @@ pub async fn serve_file(req: Request<Body>, _cache: crate::cache::Cache) -> Resu
         Ok(mut file) => {
             let mut contents = Vec::new();
             if let Err(_e) = file.read_to_end(&mut contents).await {
-                return Ok(Response::builder()
+                return Ok(with_cors(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(Body::from("Internal Server Error"))
-                    .unwrap());
+                    .unwrap()));
             }
             Ok(Response::new(Body::from(contents)))
         }
         Err(_) => {
-            Ok(Response::builder()
+            Ok(with_cors(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .body(Body::from("File Not Found"))
-                .unwrap())
+                .unwrap()))
         }
     }
 }

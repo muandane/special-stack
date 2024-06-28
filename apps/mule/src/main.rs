@@ -3,6 +3,7 @@ mod cache;
 mod config;
 mod shutdown;
 mod db;
+mod utils;
 
 use handlers::file::serve_file;
 use handlers::management::{cache_file, get_cache_mapping};

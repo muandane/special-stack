@@ -7,6 +7,7 @@ use serde_json::json;
 use sha2::{Sha256, Digest};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use crate::utils::with_cors;
 
 pub async fn cache_file(cdn_root: String,req: Request<Body>, db: DbPool) -> Result<Response<Body>, Infallible> {
     let whole_body = hyper::body::to_bytes(req.into_body()).await.unwrap();
@@ -22,14 +23,14 @@ pub async fn cache_file(cdn_root: String,req: Request<Body>, db: DbPool) -> Resu
 
             add_to_cache(db, &hash, &url).await;
             info!("Cached file '{}' with hash '{}'", &url, &hash);
-            Ok(Response::new(Body::from("Cached successfully")))
+            Ok(with_cors(Response::new(Body::from("Cached successfully"))))
         },
         Err(err) => {
             error!("Failed to fetch the URL: {}", err);
-            Ok(Response::builder()
+            Ok(with_cors(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body(Body::from("Failed to fetch the URL"))
-                .unwrap())
+                .unwrap()))
         }
     }
 }
@@ -38,5 +39,5 @@ pub async fn get_cache_mapping(_req: Request<Body>, db: DbPool) -> Result<Respon
     let mappings = fetch_mappings(db).await;
     let json = json!(mappings);
 
-    Ok(Response::new(Body::from(json.to_string())))
+    Ok(with_cors(Response::new(Body::from(json.to_string()))))
 }

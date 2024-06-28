@@ -18,7 +18,6 @@
 	 * @type {string | null}
 	 */
   let serverLocation = null;
-
   async function measureLatency() {
     try {
       console.log('Measuring latency for:', backgroundUrl);
@@ -42,12 +41,12 @@
       const data = await response.json();
       serverLocation = data.timezone;
     } catch (error) {
-      // @ts-ignore
-      console.error('Error measuring latency:', error.message);
+      console.error('Error measuring latency:', error);
       latency = serverLatency = -1;
       serverLocation = 'Error';
     }
   }
+
 
   onMount(measureLatency);
 </script>

@@ -1,12 +1,12 @@
 <script>
 	/*const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
 	const imageText = import.meta.env.VITE_EPIC_NAME;*/
-	const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
-	const imageText = import.meta.env.VITE_EPIC_NAME;
-	// import 'dotenv/config';
+	// const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
+	// const imageText = import.meta.env.VITE_EPIC_NAME;
+	import 'dotenv/config';
 	import LatencyCounter from './HUD.svelte';
-	// const backgroundUrl = process.env.PUBLIC_EPIC_GIF;
-	// const imageText = process.env.PUBLIC_EPIC_NAME;
+	const backgroundUrl = process.env.PUBLIC_EPIC_GIF;
+	const imageText = process.env.PUBLIC_EPIC_NAME;
 </script>
 
 
