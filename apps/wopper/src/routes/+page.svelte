@@ -1,12 +1,12 @@
 <script>
 	/*const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
 	const imageText = import.meta.env.VITE_EPIC_NAME;*/
-	const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
-	const imageText = import.meta.env.VITE_EPIC_NAME;
-	// import 'dotenv/config';
+	// const backgroundUrl = import.meta.env.VITE_EPIC_GIF;
+	// const imageText = import.meta.env.VITE_EPIC_NAME;
+	import 'dotenv/config';
 	import LatencyCounter from './HUD.svelte';
-	// const backgroundUrl = process.env.PUBLIC_EPIC_GIF;
-	// const imageText = process.env.PUBLIC_EPIC_NAME;
+	const backgroundUrl = process.env.PUBLIC_EPIC_GIF;
+	const imageText = process.env.PUBLIC_EPIC_NAME;
 </script>
 
 
@@ -63,6 +63,7 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		align-content: center;
 	}
 
 	#piece {
@@ -124,6 +125,7 @@
 		background: url(https://hampter.io/hampter.gif);
 		background-size: cover;
 		height: calc(clamp(30vh, 50vw, 50vh) * 0.79);
+		align-content: center;
 		left: 0.9%;
 		position: absolute;
 		top: 5.4%;
