@@ -57,6 +57,11 @@ Then, push it to your registry, e.g. `docker push myregistry.com/myapp`.
 Consult Docker's [getting started](https://docs.docker.com/go/get-started-sharing/)
 docs for more detail on building and pushing.
 
+This webapp takes 2 variables:
+
+- `EPIC_CONTENT`: the content to be dispalyed
+- `EPIC_NAME`: the title of the content
+
 ### References
 
 - [Docker's Node.js guide](https://docs.docker.com/language/nodejs/)
