@@ -4,34 +4,59 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
+	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-var s3Client *s3.Client
+var minioClient *minio.Client
+
+// CacheEntry represents a cached object with metadata
+type CacheEntry struct {
+	Data         []byte
+	ContentType  string
+	Size         int64
+	LastModified time.Time
+	ETag         string
+	ExpiresAt    time.Time
+}
+
+// Cache configuration
+const (
+	defaultCacheDuration = 5 * time.Minute
+	maxCacheSize         = 100 * 1024 * 1024 // 100MB
+	cleanupInterval      = 1 * time.Minute
+)
+
+var (
+	cache     sync.Map
+	cacheSize int64
+	cacheMux  sync.Mutex
+)
 
 func init() {
-	region := getEnv("AWS_REGION", "us-east-1")
+	endpoint := getEnv("S3_ENDPOINT", "localhost:9000")
+	accessKeyID := getEnv("S3_ACCESS_KEY", "minioadmin")
+	secretAccessKey := getEnv("S3_SECRET_KEY", "minioadmin")
+	useSSL := getEnv("S3_USE_SSL", "false") == "true"
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion(region),
-		config.WithHTTPClient(&http.Client{
-			Timeout:   30 * time.Second,
-			Transport: getS3TransportWithSigV4(),
-		}),
-	)
+	var err error
+	minioClient, err = minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+		Secure: useSSL,
+	})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to load AWS config: %v", err))
+		panic(fmt.Sprintf("Failed to initialize Minio client: %v", err))
 	}
 
-	s3Client = s3.NewFromConfig(cfg)
+	// Start cache cleanup goroutine
+	go cleanupCache()
 }
 
 func getEnv(key, defaultValue string) string {
@@ -39,8 +64,64 @@ func getEnv(key, defaultValue string) string {
 	if value == "" {
 		return defaultValue
 	}
-
 	return value
+}
+
+func cleanupCache() {
+	ticker := time.NewTicker(cleanupInterval)
+	for range ticker.C {
+		now := time.Now()
+		cache.Range(func(key, value interface{}) bool {
+			entry := value.(*CacheEntry)
+			if now.After(entry.ExpiresAt) {
+				cache.Delete(key)
+				cacheMux.Lock()
+				cacheSize -= entry.Size
+				cacheMux.Unlock()
+			}
+			return true
+		})
+	}
+}
+
+func getCacheKey(bucket, key string) string {
+	return fmt.Sprintf("%s/%s", bucket, key)
+}
+
+func addToCache(cacheKey string, data []byte, contentType string, size int64, lastModified time.Time, etag string) {
+	// Check if adding this item would exceed the max cache size
+	cacheMux.Lock()
+	defer cacheMux.Unlock()
+
+	if int64(len(data)) > maxCacheSize {
+		return // Don't cache files larger than max cache size
+	}
+
+	// Remove old entries if necessary
+	if cacheSize+int64(len(data)) > maxCacheSize {
+		// Remove oldest entries until we have enough space
+		var keysToDelete []interface{}
+		cache.Range(func(key, value interface{}) bool {
+			keysToDelete = append(keysToDelete, key)
+			entry := value.(*CacheEntry)
+			cacheSize -= entry.Size
+			return cacheSize+int64(len(data)) > maxCacheSize
+		})
+		for _, key := range keysToDelete {
+			cache.Delete(key)
+		}
+	}
+
+	entry := &CacheEntry{
+		Data:         data,
+		ContentType:  contentType,
+		Size:         size,
+		LastModified: lastModified,
+		ETag:         etag,
+		ExpiresAt:    time.Now().Add(defaultCacheDuration),
+	}
+	cache.Store(cacheKey, entry)
+	cacheSize += size
 }
 
 func main() {
@@ -54,36 +135,85 @@ func main() {
 
 func getObject(c *gin.Context) {
 	bucket := c.Param("bucket")
-	key := c.Param("key")
+	key := c.Param("key")[1:]
+	cacheKey := getCacheKey(bucket, key)
 
-	resp, err := s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
+	// Check cache first
+	if entry, ok := cache.Load(cacheKey); ok {
+		cacheEntry := entry.(*CacheEntry)
+		if time.Now().Before(cacheEntry.ExpiresAt) {
+			c.DataFromReader(
+				http.StatusOK,
+				cacheEntry.Size,
+				cacheEntry.ContentType,
+				io.NopCloser(io.NewSectionReader(bytes.NewReader(cacheEntry.Data), 0, cacheEntry.Size)),
+				nil,
+			)
+			return
+		}
+		// Cache expired, remove it
+		cache.Delete(cacheKey)
+		cacheMux.Lock()
+		cacheSize -= cacheEntry.Size
+		cacheMux.Unlock()
+	}
+
+	// Cache miss, get from S3
+	obj, err := minioClient.GetObject(context.Background(), bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	defer resp.Body.Close()
 
-	c.DataFromReader(http.StatusOK, aws.ToInt64(resp.ContentLength), aws.ToString(resp.ContentType), resp.Body, nil)
+	info, err := obj.Stat()
+	if err != nil {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// Read the entire object
+	data, err := io.ReadAll(obj)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// Cache the object
+	addToCache(cacheKey, data, info.ContentType, info.Size, info.LastModified, info.ETag)
+
+	// Send response
+	c.DataFromReader(
+		http.StatusOK,
+		info.Size,
+		info.ContentType,
+		io.NopCloser(bytes.NewReader(data)),
+		nil,
+	)
 }
 
 func putObject(c *gin.Context) {
 	bucket := c.Param("bucket")
-	key := c.Param("key")
+	key := c.Param("key")[1:]
+	cacheKey := getCacheKey(bucket, key)
 
-	body, err := c.GetRawData()
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
+	// Remove from cache if exists
+	if entry, ok := cache.LoadAndDelete(cacheKey); ok {
+		cacheMux.Lock()
+		cacheSize -= entry.(*CacheEntry).Size
+		cacheMux.Unlock()
 	}
 
-	_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-		Body:   bytes.NewReader(body),
-	})
+	contentType := c.GetHeader("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	_, err := minioClient.PutObject(context.Background(), bucket, key, c.Request.Body, -1,
+		minio.PutObjectOptions{ContentType: contentType})
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -94,12 +224,17 @@ func putObject(c *gin.Context) {
 
 func deleteObject(c *gin.Context) {
 	bucket := c.Param("bucket")
-	key := c.Param("key")
+	key := c.Param("key")[1:]
+	cacheKey := getCacheKey(bucket, key)
 
-	_, err := s3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
+	// Remove from cache if exists
+	if entry, ok := cache.LoadAndDelete(cacheKey); ok {
+		cacheMux.Lock()
+		cacheSize -= entry.(*CacheEntry).Size
+		cacheMux.Unlock()
+	}
+
+	err := minioClient.RemoveObject(context.Background(), bucket, key, minio.RemoveObjectOptions{})
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -110,38 +245,41 @@ func deleteObject(c *gin.Context) {
 
 func headObject(c *gin.Context) {
 	bucket := c.Param("bucket")
-	key := c.Param("key")
+	key := c.Param("key")[1:]
+	cacheKey := getCacheKey(bucket, key)
 
-	resp, err := s3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
+	// Check cache first
+	if entry, ok := cache.Load(cacheKey); ok {
+		cacheEntry := entry.(*CacheEntry)
+		if time.Now().Before(cacheEntry.ExpiresAt) {
+			c.Header("Content-Type", cacheEntry.ContentType)
+			c.Header("Content-Length", fmt.Sprintf("%d", cacheEntry.Size))
+			c.Header("Last-Modified", cacheEntry.LastModified.UTC().Format(http.TimeFormat))
+			c.Header("ETag", cacheEntry.ETag)
+			c.Status(http.StatusOK)
+			return
+		}
+		// Cache expired, remove it
+		cache.Delete(cacheKey)
+		cacheMux.Lock()
+		cacheSize -= cacheEntry.Size
+		cacheMux.Unlock()
+	}
+
+	// Cache miss, get from S3
+	info, err := minioClient.StatObject(context.Background(), bucket, key, minio.StatObjectOptions{})
 	if err != nil {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	c.Header("Content-Type", aws.ToString(resp.ContentType))
-	c.Header("Content-Length", fmt.Sprintf("%d", aws.ToInt64(resp.ContentLength)))
+	c.Header("Content-Type", info.ContentType)
+	c.Header("Content-Length", fmt.Sprintf("%d", info.Size))
+	c.Header("Last-Modified", info.LastModified.UTC().Format(http.TimeFormat))
+	c.Header("ETag", info.ETag)
 	c.Status(http.StatusOK)
-}
-
-func getS3TransportWithSigV4() *http.Transport {
-	const timeout = 30 * time.Second
-
-	dialer := &net.Dialer{
-		Timeout:   timeout,
-		KeepAlive: timeout,
-		DualStack: true,
-	}
-
-	return &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           dialer.DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
 }
